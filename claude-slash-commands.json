@@ -1,0 +1,35 @@
+{
+  "$schema": "https://claude.ai/schemas/slash-commands.json",
+  "commands": [
+    {
+      "name": "fork-detect",
+      "description": "Find relevant historical sessions across all projects",
+      "prompt": "Run the smart-fork detect command to find relevant sessions. Arguments: {args}",
+      "entrypoint": "node_modules/.bin/smart-fork detect"
+    },
+    {
+      "name": "fork-to",
+      "description": "Switch to a specific historical session",
+      "prompt": "Switch to session {args}",
+      "entrypoint": "node_modules/.bin/smart-fork fork-to"
+    },
+    {
+      "name": "index-session",
+      "description": "Index current session for future searching",
+      "prompt": "Index the current session with any provided summary or tags: {args}",
+      "entrypoint": "node_modules/.bin/smart-fork index"
+    },
+    {
+      "name": "list-sessions",
+      "description": "List all indexed sessions",
+      "prompt": "List all indexed sessions",
+      "entrypoint": "node_modules/.bin/smart-fork list"
+    },
+    {
+      "name": "fork-status",
+      "description": "Show current fork status and suggestions",
+      "prompt": "Show fork status and suggested sessions",
+      "entrypoint": "node_modules/.bin/smart-fork status"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+# Source files (we publish dist/ only)
+src/
+tsconfig.json
+jest.config.js
+.eslintrc.js
+.prettierrc
+
+# Development
+.git/
+.github/
+.vscode/
+.idea/
+
+# Testing
+**/__tests__/
+coverage/
+*.test.ts
+*.spec.ts
+
+# Build
+*.tsbuildinfo
+
+# CI
+.github/workflows/
+
+# Docs (published separately)
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+SECURITY.md
+
+# Local data
+.sessions/
+index.json
