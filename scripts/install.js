@@ -12,6 +12,8 @@ function installClaudeHooks() {
 
   // Find Claude Code configuration directory
   const possiblePaths = [
+    // Cross-platform: ~/.claude/settings.json (primary location for Claude Code)
+    path.join(os.homedir(), '.claude', 'settings.json'),
     // macOS
     path.join(os.homedir(), 'Library', 'Application Support', 'Claude', 'settings.json'),
     // Linux
