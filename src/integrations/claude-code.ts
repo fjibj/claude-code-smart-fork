@@ -106,22 +106,53 @@ ${query.substring(0, 200)}...
 
   /**
    * Handle /fork-to slash command
-   * Switches to a specific historical session
+   * Switches to a specific historical session with full conversation context
    */
   async handleForkTo(sessionId: string): Promise<string> {
     await this.initialize();
 
     try {
-      await this.sessionManager.forkToSession(sessionId);
+      // Load session to show preview before forking
+      const session = await this.sessionManager['loadSession'](sessionId);
+      if (!session) {
+        return `## ❌ Session Not Found
 
-      return `## ✅ Successfully Forked to Session
+Session \`${sessionId}\` not found.
 
-You have been switched to session \`${sessionId}\`.
+Use \`/list-sessions\` to see available sessions.`;
+      }
 
-The working directory and context have been restored.
-You can now continue the conversation from where it left off.
+      // Show session preview
+      let preview = `## 🔀 Forking to Session
 
-**Note:** To go back, use \`/fork-back\``;
+**Session ID:** \`${sessionId}\`
+**Project:** ${session.projectName}
+**Summary:** ${session.summary}
+
+`;
+
+      // Show conversation preview (last 3 turns)
+      const history = session.conversationHistory || [];
+      if (history.length > 0) {
+        preview += `### 💬 Conversation Preview (last ${Math.min(3, history.length)} of ${history.length} turns):\n\n`;
+
+        const previewTurns = history.slice(-3);
+        previewTurns.forEach((turn, idx) => {
+          const turnNum = history.length - 3 + idx + 1;
+          preview += `**Turn ${turnNum}:**\n`;
+          preview += `- 👤 **You:** ${turn.userMessage.content.substring(0, 100)}${turn.userMessage.content.length > 100 ? '...' : ''}\n`;
+          if (turn.assistantMessage) {
+            preview += `- 🤖 **Claude:** ${turn.assistantMessage.content.substring(0, 100)}${turn.assistantMessage.content.length > 100 ? '...' : ''}\n`;
+          }
+          preview += '\n';
+        });
+      }
+
+      preview += `Click below to complete the fork and continue the conversation:\n`;
+      preview += `[✅ Complete Fork](/fork-to-confirm ${sessionId})\n\n`;
+      preview += `Or run \`/fork-to ${sessionId}\` to switch directly.`;
+
+      return preview;
     } catch (error) {
       return `## ❌ Fork Failed
 
@@ -133,31 +164,50 @@ Use \`/list-sessions\` to see available sessions.`;
 
   /**
    * Handle /index-session slash command
-   * Indexes the current session for future searching
+   * Indexes the current session with full conversation history for future searching
    */
-  async handleIndexSession(summary?: string, tags?: string[]): Promise<string> {
+  async handleIndexSession(summary?: string, tags?: string[], conversationHistory?: any[]): Promise<string> {
     await this.initialize();
 
     try {
+      // If no conversation history provided, try to extract from current Claude Code context
+      if (!conversationHistory) {
+        conversationHistory = await this.extractCurrentConversation();
+      }
+
       const session = await this.sessionManager.indexCurrentSession({
         summary,
-        tags
+        tags,
+        conversationHistory
       });
+
+      const turns = session.conversationHistory?.length || 0;
 
       return `## ✅ Session Indexed Successfully
 
 **Session ID:** \`${session.id}\`
 **Project:** ${session.projectName}
-**Messages:** ${session.messages.length}
+**Conversation Turns:** ${turns}
 **Summary:** ${session.summary}
 
-This session is now searchable. When you have a similar task in the future,
-use \`/fork-detect\` to find and resume this session.`;
+This session is now searchable with full conversation history. When you have a similar task in the future, use \`/fork-detect\` to find and resume this session.
+
+The forked session will include both your questions and Claude's responses.`;
     } catch (error) {
       return `## ❌ Indexing Failed
 
 Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
+  }
+
+  /**
+   * Extract current conversation from Claude Code context
+   * This would be called by Claude Code with the actual conversation data
+   */
+  private async extractCurrentConversation(): Promise<any[]> {
+    // In a real implementation, this would receive data from Claude Code
+    // For now, return empty array and let session-manager use fallback
+    return [];
   }
 
   /**

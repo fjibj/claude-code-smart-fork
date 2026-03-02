@@ -5,7 +5,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import type { Session, SessionIndex, SessionMessage } from '../types';
+import type { Session, SessionIndex, SessionMessage, ConversationTurn } from '../types';
 import { configManager } from './config';
 import { EmbeddingService } from './embedding';
 import { VectorStore } from './vector-store';
@@ -35,11 +35,15 @@ export class SessionManager {
   }
 
   /**
-   * Index the current Claude Code session
+   * Index the current Claude Code session with full conversation history
    */
   async indexCurrentSession(options: {
     summary?: string;
     tags?: string[];
+    /**
+     * Complete conversation history including both user messages and assistant responses
+     */
+    conversationHistory?: ConversationTurn[];
   } = {}): Promise<Session> {
     await this.initialize();
 
@@ -47,14 +51,17 @@ export class SessionManager {
     const projectPath = process.cwd();
     const projectName = path.basename(projectPath);
 
-    // Extract messages from Claude Code context
-    const messages = await this.extractMessages();
+    // Use provided conversation history or extract from Claude Code context
+    const conversationHistory = options.conversationHistory || await this.extractConversationHistory();
+
+    // Convert conversation history to legacy message format for compatibility
+    const messages = this.conversationToMessages(conversationHistory);
 
     // Generate summary if not provided
-    const summary = options.summary || await this.generateSummary(messages);
+    const summary = options.summary || await this.generateSummaryFromConversation(conversationHistory);
 
     // Extract key topics
-    const keyTopics = this.extractKeyTopics(messages);
+    const keyTopics = this.extractKeyTopicsFromConversation(conversationHistory);
 
     // Create session object
     const session: Session = {
@@ -65,11 +72,12 @@ export class SessionManager {
       updatedAt: Date.now(),
       messages,
       summary,
-      tags: options.tags || []
+      tags: options.tags || [],
+      conversationHistory
     };
 
-    // Generate embedding for the session
-    const sessionText = this.sessionToText(session);
+    // Generate embedding for the session (include both user and assistant content)
+    const sessionText = this.conversationToText(conversationHistory);
     session.embedding = await this.embeddingService.embed(sessionText);
 
     // Save full session
@@ -148,14 +156,40 @@ export class SessionManager {
       }
     }
 
-    // 4. Display session summary
+    // 4. Display session summary and conversation history
     console.log('\n📋 Session Summary:');
     console.log(session.summary);
-    console.log('\n💬 Recent Messages:');
-    session.messages.slice(-5).forEach(msg => {
-      const prefix = msg.role === 'user' ? '👤' : '🤖';
-      console.log(`${prefix} ${msg.content.substring(0, 100)}...`);
+
+    // Display full conversation history
+    console.log('\n💬 Conversation History:');
+    console.log('─'.repeat(60));
+
+    const history = session.conversationHistory || this.messagesToConversation(session.messages);
+
+    history.forEach((turn, index) => {
+      console.log(`\n[${index + 1}] 👤 User:`);
+      console.log(turn.userMessage.content);
+
+      if (turn.assistantMessage) {
+        console.log(`\n    🤖 Assistant:`);
+        // Truncate long assistant responses for display
+        const content = turn.assistantMessage.content;
+        const displayContent = content.length > 500
+          ? content.substring(0, 500) + '\n... (truncated)'
+          : content;
+        console.log(displayContent);
+      }
+
+      // Show tool calls if any
+      if (turn.assistantMessage?.toolCalls && turn.assistantMessage.toolCalls.length > 0) {
+        console.log(`    🔧 Tool calls: ${turn.assistantMessage.toolCalls.map(t => t.type).join(', ')}`);
+      }
+
+      console.log('─'.repeat(60));
     });
+
+    console.log(`\n✨ Total turns: ${history.length}`);
+    console.log('💡 You can continue the conversation from here.\n');
 
     // 5. Set environment variable to indicate forked session
     process.env.SMART_FORK_SESSION_ID = sessionId;
@@ -222,7 +256,197 @@ export class SessionManager {
     return session;
   }
 
-  // Private helper methods
+  // Private helper methods for conversation history
+
+  /**
+   * Extract conversation history from various sources
+   */
+  private async extractConversationHistory(): Promise<ConversationTurn[]> {
+    const turns: ConversationTurn[] = [];
+
+    // Try to read from Claude Code's conversation log
+    const claudeConvPath = path.join(
+      process.env.HOME || process.env.USERPROFILE || '',
+      '.claude',
+      'projects',
+      this.sanitizePath(process.cwd()),
+      'conversation.json'
+    );
+
+    try {
+      const content = await fs.readFile(claudeConvPath, 'utf-8');
+      const logData = JSON.parse(content);
+
+      if (Array.isArray(logData.conversation)) {
+        turns.push(...logData.conversation.map((turn: any) => ({
+          id: turn.id || uuidv4(),
+          timestamp: turn.timestamp || Date.now(),
+          userMessage: {
+            content: turn.userMessage?.content || '',
+            metadata: turn.userMessage?.metadata
+          },
+          assistantMessage: turn.assistantMessage ? {
+            content: turn.assistantMessage.content || '',
+            toolCalls: turn.assistantMessage.toolCalls,
+            metadata: turn.assistantMessage.metadata
+          } : undefined
+        })));
+      }
+    } catch {
+      // Conversation log not available, fallback to legacy message format
+      const messages = await this.extractMessages();
+      return this.messagesToConversation(messages);
+    }
+
+    // If no conversation found, create a placeholder
+    if (turns.length === 0) {
+      turns.push({
+        id: uuidv4(),
+        timestamp: Date.now(),
+        userMessage: {
+          content: `Working in ${process.cwd()}`
+        }
+      });
+    }
+
+    return turns;
+  }
+
+  /**
+   * Convert conversation turns to legacy message format
+   */
+  private conversationToMessages(turns: ConversationTurn[]): SessionMessage[] {
+    const messages: SessionMessage[] = [];
+
+    for (const turn of turns) {
+      // Add user message
+      messages.push({
+        id: `${turn.id}-user`,
+        role: 'user',
+        content: turn.userMessage.content,
+        timestamp: turn.timestamp,
+        metadata: turn.userMessage.metadata as any
+      });
+
+      // Add assistant message if exists
+      if (turn.assistantMessage) {
+        messages.push({
+          id: `${turn.id}-assistant`,
+          role: 'assistant',
+          content: turn.assistantMessage.content,
+          timestamp: turn.timestamp + 1,
+          metadata: turn.assistantMessage.metadata as any
+        });
+      }
+    }
+
+    return messages;
+  }
+
+  /**
+   * Convert legacy messages to conversation turns
+   */
+  private messagesToConversation(messages: SessionMessage[]): ConversationTurn[] {
+    const turns: ConversationTurn[] = [];
+    let currentTurn: Partial<ConversationTurn> = {};
+
+    for (const message of messages) {
+      if (message.role === 'user') {
+        // Save previous turn if exists
+        if (currentTurn.id) {
+          turns.push(currentTurn as ConversationTurn);
+        }
+        // Start new turn
+        currentTurn = {
+          id: message.id.replace('-user', ''),
+          timestamp: message.timestamp,
+          userMessage: {
+            content: message.content,
+            metadata: message.metadata as any
+          }
+        };
+      } else if (message.role === 'assistant' && currentTurn.id) {
+        currentTurn.assistantMessage = {
+          content: message.content,
+          metadata: message.metadata as any
+        };
+      }
+    }
+
+    // Don't forget the last turn
+    if (currentTurn.id) {
+      turns.push(currentTurn as ConversationTurn);
+    }
+
+    return turns;
+  }
+
+  /**
+   * Convert conversation to text for embedding
+   */
+  private conversationToText(turns: ConversationTurn[]): string {
+    const parts: string[] = [];
+
+    for (const turn of turns) {
+      parts.push(`User: ${turn.userMessage.content}`);
+      if (turn.assistantMessage) {
+        parts.push(`Assistant: ${turn.assistantMessage.content}`);
+      }
+    }
+
+    return parts.join('\n\n');
+  }
+
+  /**
+   * Generate summary from conversation
+   */
+  private async generateSummaryFromConversation(turns: ConversationTurn[]): Promise<string> {
+    if (turns.length === 0) {
+      return `Session in ${path.basename(process.cwd())}`;
+    }
+
+    // Use the first user message as summary basis
+    const firstUserMessage = turns[0].userMessage.content;
+    const summary = firstUserMessage.length > 200
+      ? firstUserMessage.substring(0, 200) + '...'
+      : firstUserMessage;
+
+    return summary;
+  }
+
+  /**
+   * Extract key topics from conversation
+   */
+  private extractKeyTopicsFromConversation(turns: ConversationTurn[]): string[] {
+    const allText = turns
+      .map(t => `${t.userMessage.content} ${t.assistantMessage?.content || ''}`)
+      .join(' ');
+
+    // Simple keyword extraction
+    const words = allText.toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 3);
+
+    const frequency: Record<string, number> = {};
+    words.forEach(word => {
+      frequency[word] = (frequency[word] || 0) + 1;
+    });
+
+    return Object.entries(frequency)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([word]) => word);
+  }
+
+  /**
+   * Sanitize path for use in file names
+   */
+  private sanitizePath(filePath: string): string {
+    return filePath.replace(/[:\/\\]/g, '_');
+  }
+
+  // Legacy helper methods
 
   private async extractMessages(): Promise<SessionMessage[]> {
     const messages: SessionMessage[] = [];

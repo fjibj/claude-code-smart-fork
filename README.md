@@ -126,6 +126,127 @@ Requires `OPENAI_API_KEY` environment variable.
 ```
 Requires a running Ollama server.
 
+## 💡 Usage Examples
+
+### Example 1: Index a Session with Conversation History
+
+```bash
+# Create a conversation history file
+cat > conversation.json << 'EOF'
+[
+  {
+    "id": "turn-1",
+    "timestamp": 1709400000000,
+    "userMessage": {
+      "content": "How do I implement user authentication?",
+      "metadata": { "files": ["auth.js"] }
+    },
+    "assistantMessage": {
+      "content": "I recommend using JWT + OAuth2. JWT is great for stateless auth, OAuth2 for third-party login.",
+      "toolCalls": [{"id": "1", "type": "search", "parameters": {"query": "JWT best practices"}}]
+    }
+  },
+  {
+    "id": "turn-2",
+    "timestamp": 1709400100000,
+    "userMessage": {
+      "content": "Show me code examples"
+    },
+    "assistantMessage": {
+      "content": "Here's a Node.js example using jsonwebtoken...",
+      "toolCalls": [
+        {"id": "2", "type": "read_file", "parameters": {"path": "examples/auth.js"}},
+        {"id": "3", "type": "edit_file", "parameters": {"path": "src/auth.js"}}
+      ]
+    }
+  }
+]
+EOF
+
+# Index the session
+smart-fork index --conversation conversation.json --summary "User authentication with JWT" --tags "auth,jwt,nodejs"
+
+# Output:
+# ✓ Session indexed successfully!
+# Session ID: 096549e9-13bd-45bd-9f6c-659d55c78b35
+# Conversation turns: 2
+# Total messages: 4
+```
+
+### Example 2: Find and Resume a Session
+
+```bash
+# Search for relevant sessions
+smart-fork detect --query "authentication JWT code examples"
+
+# Output:
+# ✓ Found 1 relevant session(s):
+#
+# 1. my-first-app
+#    Path: D:\\claudecode\\MyAICodes\\my-first-app
+#    Relevance: 85%
+#    Summary: User authentication with JWT
+#    Last updated: 2026/3/2
+
+# Fork to the session
+smart-fork fork-to 096549e9-13bd-45bd-9f6c-659d55c78b35
+
+# Output:
+# 💬 Conversation History:
+# ────────────────────────────────────────────────────────────
+# [1] 👤 User:
+# How do I implement user authentication?
+#     🤖 Assistant:
+# I recommend using JWT + OAuth2...
+#     🔧 Tool calls: search
+# ────────────────────────────────────────────────────────────
+# [2] 👤 User:
+# Show me code examples
+#     🤖 Assistant:
+# Here's a Node.js example...
+#     🔧 Tool calls: read_file, edit_file
+# ────────────────────────────────────────────────────────────
+# ✨ Total turns: 2
+# 💡 You can continue the conversation from here.
+```
+
+### Example 3: Cross-Project Search
+
+```bash
+# Index sessions in multiple projects
+# Project A: API Gateway
+cd ~/projects/api-gateway
+smart-fork index --summary "Implementing rate limiting middleware"
+
+# Project B: Frontend
+cd ~/projects/frontend
+smart-fork index --summary "Setting up React authentication context"
+
+# Search across all projects
+cd ~/projects/api-gateway
+smart-fork detect --all --query "authentication middleware"
+
+# Results will show relevant sessions from both projects!
+```
+
+### Example 4: Using with Claude Code Slash Commands
+
+```bash
+# In Claude Code, use slash commands:
+
+# Index current session
+/index-session Implementing user authentication --tags auth,jwt
+
+# Later, find relevant sessions
+/fork-detect
+
+# Fork to a specific session
+/fork-to 096549e9-13bd-45bd-9f6c-659d55c78b35
+
+# List all sessions
+/list-sessions
+```
+
 ## 📁 Data Storage
 
 All data is stored locally in `~/.smart-fork/`:

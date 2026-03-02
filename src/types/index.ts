@@ -12,6 +12,40 @@ export interface Session {
   summary?: string;
   tags: string[];
   embedding?: number[];
+  /**
+   * Complete conversation history including both user questions and assistant responses
+   */
+  conversationHistory?: ConversationTurn[];
+}
+
+/**
+ * Represents a single turn in the conversation (user + assistant)
+ */
+export interface ConversationTurn {
+  id: string;
+  timestamp: number;
+  userMessage: {
+    content: string;
+    metadata?: {
+      files?: string[];
+      images?: string[];
+    };
+  };
+  assistantMessage?: {
+    content: string;
+    toolCalls?: ToolCall[];
+    metadata?: {
+      model?: string;
+      tokensUsed?: number;
+    };
+  };
+}
+
+export interface ToolCall {
+  id: string;
+  type: 'read_file' | 'edit_file' | 'bash' | 'search' | string;
+  parameters: Record<string, any>;
+  result?: any;
 }
 
 export interface SessionMessage {

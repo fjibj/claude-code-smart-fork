@@ -93,9 +93,10 @@ program
 // Index current session
 program
   .command('index')
-  .description('Index current session for searching')
+  .description('Index current session for searching (reads conversation history from stdin if provided)')
   .option('-s, --summary <text>', 'Session summary')
   .option('-t, --tags <tags>', 'Comma-separated tags')
+  .option('--conversation <file>', 'Path to conversation history JSON file')
   .action(async (options) => {
     try {
       await configManager.load();
@@ -104,14 +105,40 @@ program
 
       console.log(chalk.blue('\n📦 Indexing current session...\n'));
 
+      // Read conversation history from file if provided, or stdin
+      let conversationHistory;
+      if (options.conversation) {
+        const fs = await import('fs/promises');
+        const content = await fs.readFile(options.conversation, 'utf-8');
+        conversationHistory = JSON.parse(content);
+      } else if (!process.stdin.isTTY) {
+        // Read from stdin
+        const chunks: Buffer[] = [];
+        for await (const chunk of process.stdin) {
+          chunks.push(chunk);
+        }
+        const stdinContent = Buffer.concat(chunks).toString('utf-8').trim();
+        if (stdinContent) {
+          try {
+            conversationHistory = JSON.parse(stdinContent);
+          } catch {
+            // Not valid JSON, ignore
+          }
+        }
+      }
+
       const session = await sessionManager.indexCurrentSession({
         summary: options.summary,
-        tags: options.tags?.split(',').map((t: string) => t.trim()) || []
+        tags: options.tags?.split(',').map((t: string) => t.trim()) || [],
+        conversationHistory
       });
 
       console.log(chalk.green('\n✓ Session indexed successfully!\n'));
       console.log(chalk.gray(`Session ID: ${session.id}`));
-      console.log(chalk.gray(`Messages: ${session.messages.length}`));
+      console.log(chalk.gray(`Conversation turns: ${session.conversationHistory?.length || Math.ceil(session.messages.length / 2)}`));
+      if (session.conversationHistory) {
+        console.log(chalk.gray(`Total messages: ${session.messages.length}`));
+      }
 
     } catch (error) {
       console.error(chalk.red('\nError:'), error instanceof Error ? error.message : error);
