@@ -43,11 +43,16 @@
     "ai",
     "cli"
   ],
-  "author": "Your Name <your-email@example.com>",
+  "author": "fjibj",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/claude-code-smart-fork.git"
+    "url": "git+https://github.com/fjibj/claude-code-smart-fork.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fjibj/claude-code-smart-fork/issues"
+  },
+  "homepage": "https://github.com/fjibj/claude-code-smart-fork#readme",
   },
   "bugs": {
     "url": "https://github.com/yourusername/claude-code-smart-fork/issues"
