@@ -5,9 +5,9 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "smart-fork": "./dist/index.js",
-    "cc-fork": "./dist/index.js",
-    "fork-detect": "./dist/index.js"
+    "smart-fork": "dist/index.js",
+    "cc-fork": "dist/index.js",
+    "fork-detect": "dist/index.js"
   },
   "files": [
     "dist/**/*",
