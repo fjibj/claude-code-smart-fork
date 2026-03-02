@@ -9,13 +9,14 @@ import { SessionManager } from '../core/session-manager';
 import { configManager } from '../core/config';
 import chalk from 'chalk';
 import * as readline from 'readline';
+import * as packageJson from '../../package.json';
 
 const program = new Command();
 
 program
   .name('smart-fork')
   .description('Smart session forking for Claude Code')
-  .version('1.0.0');
+  .version(packageJson.version);
 
 // /fork-detect command
 program
