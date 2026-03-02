@@ -2,9 +2,11 @@
 
 🔀 **Smart session forking for Claude Code** - Find and resume relevant historical sessions across all your projects using AI-powered semantic search.
 
+**[中文](README.zh-CN.md)** | **[English](README.md)**
+
 [![npm version](https://badge.fury.io/js/claude-code-smart-fork.svg)](https://www.npmjs.com/package/claude-code-smart-fork)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js CI](https://github.com/yourusername/claude-code-smart-fork/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/claude-code-smart-fork/actions)
+[![Node.js CI](https://github.com/fjibj/claude-code-smart-fork/actions/workflows/ci.yml/badge.svg)](https://github.com/fjibj/claude-code-smart-fork/actions)
 
 ## 🌟 Features
 
@@ -262,7 +264,7 @@ All data is stored locally in `~/.smart-fork/`:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/claude-code-smart-fork.git
+git clone https://github.com/fjibj/claude-code-smart-fork.git
 cd claude-code-smart-fork
 
 # Install dependencies
@@ -312,6 +314,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 📮 Support
 
-- 🐛 [Report a bug](https://github.com/yourusername/claude-code-smart-fork/issues)
-- 💡 [Request a feature](https://github.com/yourusername/claude-code-smart-fork/issues)
-- 📧 Contact: your-email@example.com
+- 🐛 [Report a bug](https://github.com/fjibj/claude-code-smart-fork/issues)
+- 💡 [Request a feature](https://github.com/fjibj/claude-code-smart-fork/issues)
+- 📧 Contact: fjibj@users.noreply.github.com
