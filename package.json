@@ -53,11 +53,6 @@
     "url": "https://github.com/fjibj/claude-code-smart-fork/issues"
   },
   "homepage": "https://github.com/fjibj/claude-code-smart-fork#readme",
-  },
-  "bugs": {
-    "url": "https://github.com/yourusername/claude-code-smart-fork/issues"
-  },
-  "homepage": "https://github.com/yourusername/claude-code-smart-fork#readme",
   "dependencies": {
     "chalk": "^4.1.2",
     "commander": "^12.1.0",
