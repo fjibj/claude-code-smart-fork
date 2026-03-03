@@ -617,6 +617,52 @@ export class SessionManager {
     await fs.writeFile(forkPath, JSON.stringify(context, null, 2));
   }
 
+  private async loadForkContext(): Promise<any | null> {
+    const forkPath = path.join(
+      configManager.getSessionsDir(),
+      'fork-context.json'
+    );
+    try {
+      const content = await fs.readFile(forkPath, 'utf-8');
+      return JSON.parse(content);
+    } catch {
+      return null;
+    }
+  }
+
+  private async clearForkContext(): Promise<void> {
+    const forkPath = path.join(
+      configManager.getSessionsDir(),
+      'fork-context.json'
+    );
+    try {
+      await fs.unlink(forkPath);
+    } catch {
+      // File doesn't exist
+    }
+  }
+
+  /**
+   * Fork back to the original session before the last fork
+   */
+  async forkBack(): Promise<void> {
+    await this.initialize();
+
+    const context = await this.loadForkContext();
+    if (!context || !context.sourceSessionId) {
+      throw new Error('No fork context found. You haven\'t forked to a session yet.');
+    }
+
+    const sourceSessionId = context.sourceSessionId;
+    console.log(`\n🔄 Forking back to previous session: ${sourceSessionId}\n`);
+
+    // Clear the fork context
+    await this.clearForkContext();
+
+    // Set the source session ID
+    process.env.SMART_FORK_SESSION_ID = sourceSessionId;
+  }
+
   private getCurrentSessionId(): string {
     return process.env.SMART_FORK_SESSION_ID || 'unknown';
   }

@@ -216,6 +216,26 @@ program
     }
   });
 
+// Fork back to previous session
+program
+  .command('fork-back')
+  .alias('back')
+  .description('Fork back to the session before the last fork')
+  .action(async () => {
+    try {
+      await configManager.load();
+
+      const sessionManager = new SessionManager();
+      await sessionManager.forkBack();
+
+      console.log(chalk.green('\n✓ Forked back to previous session!\n'));
+
+    } catch (error) {
+      console.error(chalk.red('\nError:'), error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
+
 // Config command
 program
   .command('config')

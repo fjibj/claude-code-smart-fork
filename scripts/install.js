@@ -79,6 +79,18 @@ Show current fork status and suggestions.
 npx smart-fork status "$@"
 \`\`\`
 `
+    },
+    {
+      name: 'fork-back',
+      description: 'Return to the session before the last fork (undo fork-to)',
+      content: `# /fork-back
+
+Return to the previous session after using /fork-to.
+
+\`\`\`bash
+npx smart-fork fork-back
+\`\`\`
+`
     }
   ];
 
