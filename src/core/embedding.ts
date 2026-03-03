@@ -98,6 +98,7 @@ export class EmbeddingService {
    * Simple keyword-based embedding
    * Used when no embedding service is available
    * Creates a bag-of-words style vector
+   * Supports both English and Chinese text
    */
   private keywordEmbedding(text: string): number[] {
     const dimension = this.config.dimension || 384;
@@ -112,16 +113,43 @@ export class EmbeddingService {
       'and', 'but', 'or', 'yet', 'so', 'if', 'because', 'although', 'though',
       'unless', 'while', 'where', 'when', 'that', 'which', 'who', 'whom', 'whose',
       'what', 'this', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they',
-      'my', 'your', 'his', 'her', 'its', 'our', 'their']);
+      'my', 'your', 'his', 'her', 'its', 'our', 'their',
+      // Chinese stop words
+      '的', '了', '是', '在', '我', '有', '和', '就', '不', '人', '都', '一', '一个',
+      '上', '也', '很', '到', '说', '要', '去', '你', '会', '着', '没有', '看', '好',
+      '自己', '这', '那', '他', '她', '它', '们', '这个', '那个', '什么', '怎么', '可以']);
 
-    // Extract words and build frequency vector
-    const words = text.toLowerCase()
+    // Extract words - handle both English and Chinese
+    // For English: split on whitespace and punctuation
+    // For Chinese: extract individual characters and common multi-char words
+    const englishWords = text.toLowerCase()
       .replace(/[^\w\s]/g, ' ')
       .split(/\s+/)
-      .filter(w => w.length > 2 && !stopWords.has(w) && !/^\d+$/.test(w));
+      .filter(w => w.length > 1 && !stopWords.has(w) && !/^\d+$/.test(w));
+
+    // Extract Chinese characters (excluding stop words)
+    const chineseChars = text.match(/[\u4e00-\u9fa5]+/g) || [];
+    const chineseTokens: string[] = [];
+    for (const chunk of chineseChars) {
+      // Add individual characters
+      for (const char of chunk) {
+        if (!stopWords.has(char)) {
+          chineseTokens.push(char);
+        }
+      }
+      // Also add 2-char combinations for better semantic matching
+      for (let i = 0; i < chunk.length - 1; i++) {
+        const bigram = chunk.slice(i, i + 2);
+        if (!stopWords.has(bigram)) {
+          chineseTokens.push(bigram);
+        }
+      }
+    }
+
+    const allTokens = [...englishWords, ...chineseTokens];
 
     // Use multiple hash functions for better distribution
-    words.forEach((word) => {
+    allTokens.forEach((word) => {
       // Hash 1: Simple rolling hash
       let hash1 = 0;
       for (let i = 0; i < word.length; i++) {
