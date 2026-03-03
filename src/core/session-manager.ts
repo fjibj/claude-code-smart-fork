@@ -497,9 +497,10 @@ export class SessionManager {
 
   /**
    * Sanitize path for use in file names
+   * Claude Code replaces :, /, \ with - (e.g., D:\path\to\project -> D--path-to-project)
    */
   private sanitizePath(filePath: string): string {
-    return filePath.replace(/[:\/\\]/g, '_');
+    return filePath.replace(/[:/\\]/g, '-');
   }
 
   // Legacy helper methods
