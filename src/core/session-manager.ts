@@ -263,50 +263,88 @@ export class SessionManager {
    */
   private async extractConversationHistory(): Promise<ConversationTurn[]> {
     const turns: ConversationTurn[] = [];
-
-    // Try to read from Claude Code's conversation log
-    const claudeConvPath = path.join(
+    const projectsDir = path.join(
       process.env.HOME || process.env.USERPROFILE || '',
       '.claude',
       'projects',
-      this.sanitizePath(process.cwd()),
-      'conversation.json'
+      this.sanitizePath(process.cwd())
     );
 
+    // Try to find the most recent .jsonl file in the projects directory
     try {
-      const content = await fs.readFile(claudeConvPath, 'utf-8');
-      const logData = JSON.parse(content);
+      const files = await fs.readdir(projectsDir);
+      const jsonlFiles = files
+        .filter(f => f.endsWith('.jsonl'))
+        .map(f => ({
+          name: f,
+          path: path.join(projectsDir, f),
+        }));
 
-      if (Array.isArray(logData.conversation)) {
-        turns.push(...logData.conversation.map((turn: any) => ({
-          id: turn.id || uuidv4(),
-          timestamp: turn.timestamp || Date.now(),
-          userMessage: {
-            content: turn.userMessage?.content || '',
-            metadata: turn.userMessage?.metadata
-          },
-          assistantMessage: turn.assistantMessage ? {
-            content: turn.assistantMessage.content || '',
-            toolCalls: turn.assistantMessage.toolCalls,
-            metadata: turn.assistantMessage.metadata
-          } : undefined
-        })));
+      // Sort by modification time (most recent first)
+      const filesWithMtime = await Promise.all(
+        jsonlFiles.map(async (file) => {
+          const stats = await fs.stat(file.path);
+          return { ...file, mtime: stats.mtime };
+        })
+      );
+      filesWithMtime.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+
+      if (filesWithMtime.length > 0) {
+        // Read the most recent .jsonl file
+        const content = await fs.readFile(filesWithMtime[0].path, 'utf-8');
+        const lines = content.trim().split('\n').filter(line => line.trim());
+
+        for (const line of lines) {
+          try {
+            const entry = JSON.parse(line);
+            // Extract user message
+            if (entry.message?.role === 'user' || entry.userMessage) {
+              const userContent = entry.message?.content?.[0]?.text ||
+                                  entry.message?.content ||
+                                  entry.userMessage?.content || '';
+              if (userContent) {
+                turns.push({
+                  id: entry.uuid || uuidv4(),
+                  timestamp: new Date(entry.timestamp || Date.now()).getTime(),
+                  userMessage: {
+                    content: userContent,
+                    metadata: entry.message?.metadata
+                  }
+                });
+              }
+            }
+            // Extract assistant message and pair with last user message
+            if (entry.message?.role === 'assistant' || entry.assistantMessage) {
+              const assistantContent = entry.message?.content
+                ?.filter((c: any) => c.type === 'text')
+                .map((c: any) => c.text)
+                .join('\n') ||
+                entry.message?.content?.[0]?.text ||
+                entry.assistantMessage?.content || '';
+
+              const toolCalls = entry.message?.toolCalls || entry.assistantMessage?.toolCalls;
+
+              if (turns.length > 0 && !turns[turns.length - 1].assistantMessage) {
+                turns[turns.length - 1].assistantMessage = {
+                  content: assistantContent,
+                  toolCalls,
+                  metadata: entry.message?.metadata
+                };
+              }
+            }
+          } catch {
+            // Skip invalid JSON lines
+          }
+        }
       }
     } catch {
-      // Conversation log not available, fallback to legacy message format
-      const messages = await this.extractMessages();
-      return this.messagesToConversation(messages);
+      // Directory not found or other error
     }
 
-    // If no conversation found, create a placeholder
+    // If no conversation found, fallback to legacy message format
     if (turns.length === 0) {
-      turns.push({
-        id: uuidv4(),
-        timestamp: Date.now(),
-        userMessage: {
-          content: `Working in ${process.cwd()}`
-        }
-      });
+      const messages = await this.extractMessages();
+      return this.messagesToConversation(messages);
     }
 
     return turns;
