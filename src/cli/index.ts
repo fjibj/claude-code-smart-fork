@@ -27,7 +27,7 @@ program
   .option('-p, --project <path>', 'Limit search to specific project')
   .option('-a, --all', 'Search across all projects', false)
   .option('-n, --limit <number>', 'Number of results', '5')
-  .option('--threshold <number>', 'Minimum similarity score', '0.6')
+  .option('--threshold <number>', 'Minimum similarity score', '0.15')
   .action(async (options) => {
     try {
       await configManager.load();
@@ -51,7 +51,7 @@ program
 
       if (results.length === 0) {
         console.log(chalk.yellow('\n❌ No relevant sessions found.\n'));
-        console.log(chalk.gray('Tip: Try using --all to search across all projects, or lower the --threshold.'));
+        console.log(chalk.gray('Tip: Try using --all to search across all projects, or increase the --threshold.'));
         return;
       }
 
