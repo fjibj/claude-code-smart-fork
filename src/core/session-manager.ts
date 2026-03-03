@@ -297,12 +297,30 @@ export class SessionManager {
         for (const line of lines) {
           try {
             const entry = JSON.parse(line);
-            // Extract user message
-            if (entry.message?.role === 'user' || entry.userMessage) {
-              const userContent = entry.message?.content?.[0]?.text ||
-                                  entry.message?.content ||
-                                  entry.userMessage?.content || '';
-              if (userContent) {
+
+            // Skip non-message entries (file-history-snapshot, etc.)
+            if (entry.type === 'file-history-snapshot') continue;
+
+            // Extract user message (type: "user" or message.role: "user")
+            if (entry.type === 'user' || entry.message?.role === 'user') {
+              // Get content from various possible locations
+              let userContent = '';
+              if (typeof entry.message?.content === 'string') {
+                userContent = entry.message.content;
+              } else if (Array.isArray(entry.message?.content)) {
+                userContent = entry.message.content
+                  .filter((c: any) => c.type === 'text')
+                  .map((c: any) => c.text)
+                  .join(' ');
+              } else if (typeof entry.content === 'string') {
+                userContent = entry.content;
+              }
+
+              // Clean up common placeholders
+              if (userContent &&
+                  !userContent.startsWith('<local-command') &&
+                  !userContent.startsWith('<command-') &&
+                  userContent.trim() !== '') {
                 turns.push({
                   id: entry.uuid || uuidv4(),
                   timestamp: new Date(entry.timestamp || Date.now()).getTime(),
@@ -313,18 +331,18 @@ export class SessionManager {
                 });
               }
             }
+
             // Extract assistant message and pair with last user message
-            if (entry.message?.role === 'assistant' || entry.assistantMessage) {
+            if (entry.type === 'assistant' || entry.message?.role === 'assistant') {
               const assistantContent = entry.message?.content
                 ?.filter((c: any) => c.type === 'text')
                 .map((c: any) => c.text)
-                .join('\n') ||
-                entry.message?.content?.[0]?.text ||
-                entry.assistantMessage?.content || '';
+                .join('\n') || '';
 
               const toolCalls = entry.message?.toolCalls || entry.assistantMessage?.toolCalls;
 
-              if (turns.length > 0 && !turns[turns.length - 1].assistantMessage) {
+              // Pair with the last user message that doesn't have an assistant response
+              if (turns.length > 0 && !turns[turns.length - 1].assistantMessage && assistantContent) {
                 turns[turns.length - 1].assistantMessage = {
                   content: assistantContent,
                   toolCalls,
