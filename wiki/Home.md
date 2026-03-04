@@ -4,6 +4,7 @@
 
 ## 📚 目录
 
+- [[项目优势 | Key-Advantages]] - 核心优势和特点
 - [[技术架构 | Technical-Architecture]] - 系统整体架构设计
 - [[工作原理 | How-It-Works]] - 详细工作流程
 - [[数据存储 | Data-Storage]] - 数据如何存储和读取
