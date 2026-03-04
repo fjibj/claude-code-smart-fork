@@ -119,30 +119,31 @@ export class SessionManager {
       process.chdir(session.projectPath);
     }
 
-    // 2. Restore git branch if possible
+    // 2. Store current context before switching
+    const sourceSessionId = this.getCurrentSessionId();
+    let gitBranch: string | undefined;
+
     try {
-      const currentBranch = execSync('git branch --show-current', {
+      gitBranch = execSync('git branch --show-current', {
         encoding: 'utf-8',
         cwd: session.projectPath
       }) as string;
-
-      // Store current context before switching
-      const forkContext = {
-        sourceSessionId: this.getCurrentSessionId(),
-        targetSessionId: sessionId,
-        preservedContext: {
-          files: await this.getOpenFiles(),
-          environment: { ...process.env },
-          gitBranch: currentBranch.trim()
-        }
-      };
-
-      // Save fork context
-      await this.saveForkContext(forkContext);
-
     } catch {
       // Not a git repository or git not available
     }
+
+    const forkContext = {
+      sourceSessionId,
+      targetSessionId: sessionId,
+      preservedContext: {
+        files: await this.getOpenFiles(),
+        environment: { ...process.env },
+        gitBranch: gitBranch?.trim()
+      }
+    };
+
+    // Save fork context
+    await this.saveForkContext(forkContext);
 
     // 3. Open relevant files from the session
     const filesToOpen = this.extractFilesFromSession(session);
